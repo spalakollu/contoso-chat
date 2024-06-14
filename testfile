@@ -1,0 +1,48 @@
+# Load the module
+Import-Module Microsoft.Xrm.Data.PowerShell
+
+# Set connection variables
+$CRMUrl = "https://your_org.crm.dynamics.com"
+$ClientId = "your_client_id"
+$ClientSecret = "your_client_secret"
+$TenantId = "your_tenant_id"
+
+# Connect to Dynamics 365
+$connection = Connect-CrmOnline -OAuthClientId $ClientId -OAuthClientSecret $ClientSecret -OAuthRedirectUri 'http://localhost' -ServerUrl $CRMUrl -TenantId $TenantId
+
+# Initialize variables for paging
+$pageNumber = 1
+$pageSize = 5000
+$fetchXmlTemplate = @"
+<fetch page='@{pageNumber}' count='@{pageSize}'>
+  <entity name='account'>
+    <attribute name='accountid' />
+    <attribute name='name' />
+    <!-- Add more attributes as needed -->
+  </entity>
+</fetch>
+"@
+
+$allRecords = @()
+
+do {
+    # Replace page number and page size in FetchXML
+    $fetchXml = $fetchXmlTemplate -replace '@{pageNumber}', $pageNumber -replace '@{pageSize}', $pageSize
+    $results = Get-CrmRecords -FetchXml $fetchXml -conn $connection
+
+    # Add results to all records
+    $allRecords += $results.CrmRecords
+    $pageNumber++
+
+    # Check if more records are available (paging cookie)
+    $moreRecords = $results.PagingCookie -ne $null
+} while ($moreRecords)
+
+# Define the output file path
+$outputFile = "/Users/your_username/path/to/output/file.csv"
+
+# Export the data to CSV with custom delimiter
+$allRecords | Export-Csv -Path $outputFile -NoTypeInformation -Delimiter "||"
+
+# Disconnect
+Disconnect-CrmOnline -conn $connection
